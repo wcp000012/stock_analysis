@@ -354,22 +354,63 @@ def download_quarterly(stock_id, con):
     return upsert_quarterly(con, stock_id, merged)
 
 
+# 2026-10-27 發現：2026-09-10 損益表來源切換成 FinMind 那次，大量股票（~300 檔）
+# 最新一季 revenue_q 被寫成只有真實值 1/500 左右（例如 3037 寫成 8033 萬，實際 410.7 億），
+# 原因不明（疑似當時 FinMind 回應或解析過程出過短暫問題），但完全沒被發現——因為
+# download_income_history() 不管資料對不對，都無條件把 income_fetched 標記成完成，
+# 80 天內不會重抓。這裡加一個跟 SUSPICIOUS_JUMP_RATIO（月營收）同樣精神的交叉驗證：
+# 用獨立來源（TWSE/TPEx 月營收，Phase 1 抓的）驗證同一季的 revenue_q 量級對不對，
+# 不對就整季跳過不寫入（寧可留空值等下次重抓，也不要寫入會騙過下游模型的錯誤數字）。
+INCOME_SUSPICIOUS_RATIO = 3
+
+
+def _quarter_month_starts(qdate):
+    q = pd.Timestamp(qdate)
+    return [(q - pd.DateOffset(months=i)).replace(day=1).strftime("%Y-%m-%d") for i in range(3)]
+
+
+def _revenue_sanity_check(con, stock_id, date, revenue_q):
+    if revenue_q in (None, 0):
+        return True
+    months = _quarter_month_starts(date)
+    placeholders = ",".join("?" * len(months))
+    row = con.execute(
+        f"SELECT SUM(revenue) FROM monthly_revenue WHERE Ticker=? AND Date IN ({placeholders})",
+        [stock_id] + months
+    ).fetchone()
+    msum = row[0] if row else None
+    if not msum:
+        return True  # 沒有月營收可比對（例如金融股本來就不公告月營收），放行
+    ratio = revenue_q / msum
+    if ratio < 1 / INCOME_SUSPICIOUS_RATIO or ratio > INCOME_SUSPICIOUS_RATIO:
+        print(f"  [可疑損益表，整季跳過未寫入] {stock_id} {date}: revenue_q={revenue_q:,.0f} "
+              f"同期月營收合計={msum:,.0f} 比值={ratio:.4f}")
+        return False
+    return True
+
+
 def upsert_income(con, stock_id, df):
     if df.empty:
-        return 0
+        return 0, 0
     cols = list(IS_FIELDS_FINMIND.values())
     for c in cols:
         if c not in df.columns:
             df[c] = None
 
-    rows = []
+    rows, skipped = [], 0
     for _, r in df.iterrows():
+        rev_q = float(r["revenue_q"]) if pd.notna(r.get("revenue_q")) else None
+        if not _revenue_sanity_check(con, stock_id, r["Date"], rev_q):
+            skipped += 1
+            continue
         vals = [str(r["Date"])[:10], stock_id] + [
             float(r[c]) if pd.notna(r.get(c)) else None
             for c in cols
         ]
         rows.append(tuple(vals))
 
+    if not rows:
+        return 0, skipped
     placeholders = ", ".join(["?"] * (2 + len(cols)))
     update_set   = ", ".join(f"{c}=excluded.{c}" for c in cols)
     col_names    = "Date, Ticker, " + ", ".join(cols)
@@ -379,7 +420,7 @@ def upsert_income(con, stock_id, df):
         ON CONFLICT(Date, Ticker) DO UPDATE SET {update_set}
     """, rows)
     con.commit()
-    return len(rows)
+    return len(rows), skipped
 
 
 def download_income_history(stock_id, con):
@@ -395,7 +436,9 @@ def download_income_history(stock_id, con):
     raw = finmind_get("TaiwanStockFinancialStatements", stock_id)
     time.sleep(SLEEP_SEC)
     pivoted = pivot_quarterly(raw, IS_FIELDS_FINMIND)
-    n = upsert_income(con, stock_id, pivoted)
+    n, skipped = upsert_income(con, stock_id, pivoted)
+    if skipped:
+        print(f"  [{stock_id}] 損益表寫入 {n} 季，跳過 {skipped} 季可疑資料")
 
     con.execute(
         "INSERT OR REPLACE INTO income_fetched (Ticker, fetched_at) VALUES (?, ?)",
