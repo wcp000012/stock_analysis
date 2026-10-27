@@ -171,6 +171,17 @@ def fetch_bulk_json(base, dataset):
 SUSPICIOUS_JUMP_RATIO = 50
 
 
+#         發現：這個欄位的原始回傳單位其實是「仟元」，不是「元」。2026-10-27 查證：
+#         拿 OpenAPI 回應裡同一筆資料的「上月營收」原始值跟資料庫裡（E7 當時手動乘 1000
+#         修正過的）同一檔股票上個月的值比對，三檔股票（1101/2317/2330）都是精確的
+#         1000 倍（例如 1101 上月營收原始值 13,515,534 ×1000 = 13,515,534,000，跟
+#         資料庫裡的值完全一致）。E7 當時只手動改了資料庫的 2026-07~09，沒有改到這裡
+#         的程式碼，所以 10 月之後每次重抓「最新一期」都還是用原始的仟元數字去跟資料庫
+#         裡已經乘過 1000 的數字比對，SUSPICIOUS_JUMP_RATIO 防線正確擋下來，但代價是
+#         9 月之後全市場約 1066 檔股票的月營收一直補不進去。這裡補上缺的 ×1000。
+MONTHLY_REVENUE_UNIT_SCALE = 1000
+
+
 def update_monthly_revenue_bulk(con, valid_tickers):
     rows = []
     for base, dataset in [(TWSE_BASE, "t187ap05_L"), (TPEX_BASE, "mopsfin_t187ap05_O")]:
@@ -182,6 +193,7 @@ def update_monthly_revenue_bulk(con, valid_tickers):
             rev  = to_float(r.get("營業收入-當月營收"))
             if date is None or rev is None:
                 continue
+            rev *= MONTHLY_REVENUE_UNIT_SCALE
             rows.append((date, code, rev))
 
     if not rows:
