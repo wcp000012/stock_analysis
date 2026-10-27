@@ -1,0 +1,58 @@
+# 密鑰與憑證 — 絕對不能進版控
+APIKey.txt
+API_key.txt
+memory/project-paperspace-ml-pipeline.md
+ca_bundle.pem
+
+# Paperspace API 回應快取 — 含真實 token 與個人資料（email/電話/大頭貼）
+gradient_volumes.json
+_projects.json
+running_notebook.json
+
+# Paperspace 遠端執行輔助腳本 — 內嵌硬編碼的 Jupyter kernel token
+# （這類 token 本來就會隨 notebook 重啟失效，之後要重寫/重貼新 token）
+_check_backtest_log.py
+_check_columns.py
+_check_db.py
+_check_env.py
+_check_merge_log.py
+_check_parquet.py
+_check_predict_log.py
+_check_remote_files.py
+_explain_top3.py
+_explain_top5.py
+_launch_backtest.py
+_monitor_merge.py
+_run_backtest.py
+_run_merge.py
+_run_remote.py
+_upload_db.py
+_verify_coverage.py
+_verify_features.py
+
+# 資料庫備份（舊快照，體積大且非必要；chip.db 本體用 Git LFS 追蹤）
+chip_backup_*.db
+
+# 執行期暫存／鎖檔／log
+*.log
+*.pid
+*.pid.txt
+_daily_update.lock
+backtest.pid
+merge.pid
+predict.pid
+__pycache__/
+.cache/
+debug_snapshots/
+daily_update_logs/
+.ipynb_checkpoints/
+.claude/
+
+# 雜項日誌/錯誤文字檔
+*log*.txt
+*err*.txt
+c
+
+# Jupyter/OS 雜項
+.DS_Store
+Thumbs.db

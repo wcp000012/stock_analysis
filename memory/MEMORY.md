@@ -1,0 +1,5 @@
+﻿- [完整專案轉移指南](project-complete-guide.md) — 換電腦必讀：腳本說明、DB 結構、模型超參數、Paperspace 環境、完整工作流程
+- [Paperspace ML Pipeline 進度](project-paperspace-ml-pipeline.md) — 當前進度與待完成事項
+- [籌碼資料缺值政策](chip-data-for-ml-null-policy.md) — 資料要餵 AI 訓練，缺值存 NULL 不補 0
+- [TWSE stat 欄位](twse-stat-field-trading-day.md) — 用 stat 區分交易日 vs 非交易日，別把真失敗當無資料
+- [跨資料源單位核對](feedback-cross-source-unit-checks.md) — 混用多個資料源算衍生指標前，要先核對金額單位/統計基礎是否一致

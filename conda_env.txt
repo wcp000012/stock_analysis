@@ -1,0 +1,12 @@
+﻿#                                                                                                                                     
+# To activate this environment, use                                                                                       
+$ /storage/miniconda/bin/conda init                                                                                
+$ source /root/.bashrc
+$ conda activate /storage/conda_envs/stock_env
+
+# Create kernal for the env                                                                                               
+$ python -m ipykernel install --user --name=stock_env --display-name "Python stock_env"            
+# Select the kernal name in jupyter notebook
+
+
+# To deactivate an active environment, use                                                                               $ conda deactivate   
